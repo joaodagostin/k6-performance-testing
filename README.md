@@ -1,4 +1,4 @@
-# Grafana K6 Performance Testing
+# Grafana K6 Performance Testing 
 
 ## GitHub Actions + SonarCloud
 
