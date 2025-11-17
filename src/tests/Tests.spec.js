@@ -4,22 +4,26 @@ import http from 'k6/http';
 import { check } from 'k6';
 import { Trend, Rate } from 'k6/metrics';
 
-export const getContactsDuration = new Trend('get_contacts', true);
-export const RateContentOK = new Rate('content_OK');
+// MÉTRICAS
+export const getRequestDuration = new Trend('get_request_duration', true);
+export const statusOK = new Rate('status_ok');
 
+// CONFIGURAÇÃO DO TESTE
 export const options = {
   thresholds: {
-    http_req_failed: ['rate<0.30'],
-    get_contacts: ['p(99)<500'],
-    content_OK: ['rate>0.95']
+    http_req_duration: ['p(90)<6800'], // 90% abaixo de 6800ms
+    status_ok: ['rate>0.95'], // 95% devem ser status 200
+    get_request_duration: ['p(90)<6800']
   },
   stages: [
-    { duration: '3s', target: 2 },
-    { duration: '3s', target: 6 },
-    { duration: '3s', target: 9 }
+    { duration: '30s', target: 7 }, // sobe até 7 VUs
+    { duration: '2m', target: 92 }, // rampa até 92 VUs
+    { duration: '1m', target: 92 }, // mantém 92 VUs
+    { duration: '30s', target: 0 } // rampa para 0 (graceful)
   ]
 };
 
+// RELATÓRIO HTML + STDOUT
 export function handleSummary(data) {
   return {
     './src/output/index.html': htmlReport(data),
@@ -27,24 +31,18 @@ export function handleSummary(data) {
   };
 }
 
+// TESTE GET
 export default function () {
-  const baseUrl = 'https://test.k6.io/';
+  const url = 'https://dummyjson.com/products/1';
 
-  const params = {
-    headers: {
-      'Content-Type': 'application/json'
-    }
-  };
+  const res = http.get(url);
 
-  const OK = 200;
+  // métricas
+  getRequestDuration.add(res.timings.duration);
+  statusOK.add(res.status === 200);
 
-  const res = http.get(`${baseUrl}`, params);
-
-  getContactsDuration.add(res.timings.duration);
-
-  RateContentOK.add(res.status === OK);
-
+  // check
   check(res, {
-    'GET Contacts - Status 200': () => res.status === OK
+    'Status 200 OK': () => res.status === 200
   });
 }
